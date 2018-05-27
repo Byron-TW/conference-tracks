@@ -16,7 +16,6 @@ Please be warned that initial compilation takes a while.
 ## Features
 
 * [x] shows correct answers
-* [x] fully streaming with minimal state
 * [x] support for profiling
 * [x] support for benchmarking
 * [x] support for linting
