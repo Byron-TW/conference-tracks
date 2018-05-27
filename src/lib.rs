@@ -40,7 +40,7 @@ pub fn answers(input: impl io::Read, output: impl io::Write) -> Result<(), Error
         ] {
             session.clear();
             schedule(session_length, &mut talks, &mut session)?;
-            format(session_start, session.iter(), session_event, &mut output)?;
+            format(session_start, &session, session_event, &mut output)?;
         }
         if num_talks_before_schedule == talks.len() {
             bail!("Could not schedule the remaining {} talks", talks.len())
@@ -58,14 +58,15 @@ fn parse_talks(input: impl io::BufRead) -> Result<Vec<Talk>, Error> {
     let mut talks = Vec::new();
     for line in input.lines() {
         let line = line.with_context(|_e| "Could not read line from input")?;
-        talks.push(line.parse::<Talk>()?);
+        talks.push(line.parse::<Talk>()
+            .with_context(|_e| format!("Could not parse talk from '{}'", line))?);
     }
     Ok(talks)
 }
 
 fn format<'a>(
     start_at: &Duration,
-    talks: impl Iterator<Item = &'a Talk>,
+    talks: &[Talk],
     special_event: &str,
     mut output: impl io::Write,
 ) -> Result<Duration, Error> {
@@ -170,7 +171,7 @@ impl FromStr for Talk {
                 duration: Duration::from_secs(LIGHTNING),
             }
         } else {
-            bail!("Could not parse talk from '{}'", s)
+            bail!("Unknown talk format: '{}'", s)
         })
     }
 }
