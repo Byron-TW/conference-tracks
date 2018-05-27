@@ -2,7 +2,7 @@
 extern crate failure;
 
 use failure::{Error, ResultExt};
-use std::{cmp, io::{self, BufReader, BufWriter, Write}, iter::once, str::FromStr, time::Duration};
+use std::{cmp, io::{self, BufReader, BufWriter, Write}, str::FromStr, time::Duration};
 
 const HOURS: u64 = 60 * 60;
 const LIGHTNING: u64 = 5 * 60;
@@ -10,6 +10,8 @@ const MORNING_SESSION_DURATION: Duration = Duration::from_secs(3 * HOURS);
 const MORNING_SESSION_START: Duration = Duration::from_secs(9 * HOURS);
 const EVENING_SESSION_MAX_DURATION: Duration = Duration::from_secs(4 * HOURS);
 const EVENING_SESSION_START: Duration = Duration::from_secs(13 * HOURS);
+const MORNING_EVENT: &'static str = "Lunch";
+const EVENING_EVENT: &'static str = "Networking Event";
 
 pub fn answers(input: impl io::Read, output: impl io::Write) -> Result<(), Error> {
     let input = BufReader::new(input);
@@ -17,15 +19,6 @@ pub fn answers(input: impl io::Read, output: impl io::Write) -> Result<(), Error
 
     let mut talks = parse_talks(input)?;
     talks.sort_by_key(|t| t.duration);
-
-    let morning_event = Talk {
-        name: "Lunch".to_owned(),
-        duration: Duration::from_secs(1 * HOURS),
-    };
-    let evening_event = Talk {
-        name: "Networking Event".to_owned(),
-        duration: Duration::from_secs(1 * HOURS),
-    };
 
     let mut track_number = 1;
     let mut session = Vec::with_capacity(16);
@@ -37,21 +30,17 @@ pub fn answers(input: impl io::Read, output: impl io::Write) -> Result<(), Error
             (
                 &MORNING_SESSION_START,
                 &MORNING_SESSION_DURATION,
-                &morning_event,
+                &MORNING_EVENT,
             ),
             (
                 &EVENING_SESSION_START,
                 &EVENING_SESSION_MAX_DURATION,
-                &evening_event,
+                &EVENING_EVENT,
             ),
         ] {
             session.clear();
             schedule(session_length, &mut talks, &mut session)?;
-            format(
-                session_start,
-                session.iter().chain(once(*session_event)),
-                &mut output,
-            )?;
+            format(session_start, session.iter(), session_event, &mut output)?;
         }
         if num_talks_before_schedule == talks.len() {
             bail!("Could not schedule the remaining {} talks", talks.len())
@@ -77,13 +66,11 @@ fn parse_talks(input: impl io::BufRead) -> Result<Vec<Talk>, Error> {
 fn format<'a>(
     start_at: &Duration,
     talks: impl Iterator<Item = &'a Talk>,
+    special_event: &str,
     mut output: impl io::Write,
 ) -> Result<Duration, Error> {
     let mut current_time = *start_at;
     for talk in talks {
-        let hour_of_day = current_time.as_secs() / HOURS;
-        let minutes_of_hour = (current_time.as_secs() % HOURS) / 60;
-        let time_of_day = if hour_of_day >= 12 { "PM" } else { "AM" };
         let duration = if talk.duration.as_secs() == LIGHTNING {
             "lightning".to_string()
         } else {
@@ -91,12 +78,22 @@ fn format<'a>(
         };
         writeln!(
             output,
-            "{} {:02}:{:02}{} {}",
-            talk.name, hour_of_day, minutes_of_hour, time_of_day, duration
+            "{} {} {}",
+            format_time(&current_time),
+            talk.name,
+            duration
         )?;
         current_time += talk.duration;
     }
+    writeln!(output, "{} {}", format_time(&current_time), special_event)?;
     Ok(current_time)
+}
+
+fn format_time(time_of_day: &Duration) -> String {
+    let hour_of_day = time_of_day.as_secs() / HOURS;
+    let minutes_of_hour = (time_of_day.as_secs() % HOURS) / 60;
+    let time_of_day = if hour_of_day >= 12 { "PM" } else { "AM" };
+    format!("{:02}:{:02}{}", hour_of_day, minutes_of_hour, time_of_day)
 }
 
 /// from https://github.com/acmeism/RosettaCodeData/blob/master/Task/Knapsack-problem-0-1/Rust/knapsack-problem-0-1.rust
